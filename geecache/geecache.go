@@ -52,6 +52,7 @@ func NewGroup(name string, cacheBytes int64, getter Getter) *Group {
 }
 
 func GetGroup(name string) *Group {
+	fmt.Println("func GetGroup(name string) *Group")
 	mu.RLock()
 	g := groups[name]
 	mu.RUnlock()
@@ -60,6 +61,7 @@ func GetGroup(name string) *Group {
 
 // Get 根据 key 从缓存中取出 value
 func (g *Group) Get (key string) (ByteView, error) {
+	fmt.Println("func (g *Group) Get (key string) (ByteView, error)")
 	if key == "" {
 		return ByteView{}, fmt.Errorf("key is required")
 	}
@@ -74,6 +76,7 @@ func (g *Group) Get (key string) (ByteView, error) {
 
 
 func (g *Group) getLocally(key string) (ByteView, error) {
+	fmt.Println("func (g *Group) getLocally(key string) (ByteView, error)")
 	bytes, err := g.getter.Get(key)
 	if err != nil {
 		return ByteView{}, err
@@ -92,6 +95,7 @@ func (g *Group) populateCache(key string, value ByteView) {
 
 //RegisterPeers 函数注册一个 PeerPicker 来选择远程的peer,实现了 PeerPicker 接口的 HTTPPool 注入到 Group 中。
 func (g *Group) RegisterPeers(peers PeerPicker) {
+	fmt.Println("func (g *Group) RegisterPeers(peers PeerPicker)")
 	if g.peers != nil {
 		panic("Register PeerPicker called more than once")
 	}
@@ -99,6 +103,7 @@ func (g *Group) RegisterPeers(peers PeerPicker) {
 }
 
 func (g *Group) load(key string) (value ByteView, err error) {
+	fmt.Println("func (g *Group) load(key string) (value ByteView, err error)")
 	//将原本的 load 方法赋给 Do 的 fn 函数，当 Do 条件满足时就会调用 fn 获取结果
 	viewi, err := g.loader.Do(key, func() (interface{}, error) {
 		if g.peers != nil {
@@ -129,6 +134,7 @@ func (g *Group) load(key string) (value ByteView, err error) {
 
 // 使用了gRPC的getFromPeer
 func (g *Group) getFromPeer(peer PeerGetter, key string) (ByteView, error) {
+	fmt.Println("func (g *Group) getFromPeer(peer PeerGetter, key string) (ByteView, error)")
 	req := &pb.Request{
 		Group: g.name,
 		Key: key,

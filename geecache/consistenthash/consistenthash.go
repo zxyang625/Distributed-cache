@@ -1,6 +1,7 @@
 package consistenthash
 
 import (
+	"fmt"
 	"hash/crc32"
 	"sort"
 	"strconv"
@@ -30,6 +31,7 @@ func New(replicas int, fn Hash) *Map {
 
 //Add 方法对应的是增加Map的真实结点，传入的是若干个结点的名称
 func (m *Map) Add(keys ...string) {
+	fmt.Println("func (m *Map) Add(keys ...string)")
 	for _, key := range keys {
 		for i := 0; i < m.replicas; i++ {	//对每个结点,创建replicas个虚拟节点,虚拟节点的名字是[编号]+真实结点的名字
 			hash := int(m.hash([]byte(strconv.Itoa(i) + key)))	//计算每个虚拟结点的hash值
@@ -39,10 +41,13 @@ func (m *Map) Add(keys ...string) {
 	}
 
 	sort.Ints(m.keys)											//最后对所有哈希值排序
+	fmt.Println(m.keys)
+	fmt.Println(m.hashMap)
 }
 
 // Get 方法实现选择结点
 func (m *Map) Get(key string) string {
+	fmt.Println("func (m *Map) Get(key string) string")
 	if len(m.keys) == 0 {
 		return ""
 	}
@@ -54,4 +59,23 @@ func (m *Map) Get(key string) string {
 
 	//keys通过索引获取hash值，hashMap通过hash值获取真实结点。当key比m.keys所有都大的时候，idx可能等于len(m.keys)所以需要取余
 	return m.hashMap[m.keys[idx % len(m.keys)]]
+}
+
+func (m *Map) Remove(key string) {
+	fmt.Println("func (m *Map) Remove(keys ...string)")
+	dMap := make(map[int]bool)
+	for i := 0; i < m.replicas; i++ {
+		hash := int(m.hash([]byte(strconv.Itoa(i) + key)))
+		dMap[hash] = true
+		delete(m.hashMap, hash)
+	}
+
+	//切片中删除多个
+	for i := 0; i < len(m.keys); i++ {
+		if _, ok := dMap[m.keys[i]]; ok {
+			m.keys = append(m.keys[:i], m.keys[i+1:]...)
+			i = i - 1
+		}
+	}
+
 }

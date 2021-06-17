@@ -3,6 +3,7 @@ package geecache
 import (
 	"cache/geecache/consistenthash"
 	"cache/geecache/pb"
+	"encoding/json"
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"io/ioutil"
@@ -11,10 +12,11 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 )
 
 const defaultBasePath = "/_geecache/"
-const defaultReplicas = 50
+const defaultReplicas = 3
 
 // HTTPPool 作为承载结点间HTTP通信的核心数据结构
 type HTTPPool struct {
@@ -23,6 +25,12 @@ type HTTPPool struct {
 	mu sync.Mutex
 	peers *consistenthash.Map	//用来根据具体的 key 选择节点
 	httpGetters map[string]*httpGetter	//映射远程节点与对应的 httpGetter。每一个远程节点对应一个 httpGetter，因为 httpGetter 与远程节点的地址 baseURL 有关。
+}
+
+type failMsg struct {
+	DetectedTime time.Time 	`json:"detected_time"`
+	SentinelName string 	`json:"sentinel_name"`
+	PeerName string			`json:"peer_name"`
 }
 
 func NewHTTPPool(self string) *HTTPPool {
@@ -36,19 +44,29 @@ func (p *HTTPPool) Log(format string, v ...interface{}) {
 	log.Printf("[Server %s] %s", p.self, fmt.Sprintf(format, v...))
 }
 
-func (p *HTTPPool) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if !strings.HasPrefix(r.URL.Path, p.basePath) {
-		panic("HTTPPool serving unexpected path: " + r.URL.Path)
-	}
-	p.Log("%s %s", r.Method, r.URL.Path)
-	// /<basepath>/<groupname>/<key> required
-	//spiltN之后， 例如 /scores/Tom,会被分成 "" "scores" 和 "Tom"
-	parts := strings.SplitN(r.URL.Path[len(p.basePath):], "/", 2)
-	if len(parts) != 2 {
-		http.Error(w, "bad request", http.StatusBadRequest)
-		return
-	}
+func (p *HTTPPool) ListenSentinel(w http.ResponseWriter, r *http.Request) {
+	body, _ := ioutil.ReadAll(r.Body)
+	defer r.Body.Close()
 
+	msg := failMsg{}
+	json.Unmarshal(body, &msg)
+
+	delete(p.httpGetters, msg.PeerName)
+	p.peers.Remove(msg.PeerName)
+	//msg.detectedTime = time.Now()
+	//resp, _ := json.Marshal(msg)
+	//w.Header().Set("Content-Type", "application/json")
+	//w.Write(resp)
+	fmt.Println(p.self, "delete succeed")
+}
+
+func (p *HTTPPool) ResponseStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Write([]byte("hello"))
+}
+
+func (p *HTTPPool) GetKey(w http.ResponseWriter, r *http.Request) {
+	parts := strings.SplitN(r.URL.Path[len(defaultBasePath):], "/", 2)
 	groupName := parts[0]
 	key := parts[1]
 	group := GetGroup(groupName)
@@ -73,11 +91,10 @@ func (p *HTTPPool) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/octet-stream")
 	//w.Write(view.ByteSlice())
 	w.Write(body)
-
 }
 
-
 func (p *HTTPPool) Set(peers ...string) {
+	fmt.Println("func (p *HTTPPool) Set(peers ...string)")
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -93,15 +110,17 @@ func (p *HTTPPool) Set(peers ...string) {
 }
 
 func (p *HTTPPool) PickPeer (key string) (PeerGetter, bool) {
+	fmt.Println("func (p *HTTPPool) PickPeer (key string) (PeerGetter, bool)")
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if peer := p.peers.Get(key); peer != "" && peer != p.self {
+	if peer := p.peers.Get(key); peer != "" && peer != p.self{
 		p.Log("Pick peer %s", peer)
 		return p.httpGetters[peer], true
+	} else  {
+		p.Log("Peer pick self %s, search DB", peer)
+		return nil, false
 	}
-
-	return nil, false
 }
 
 //httpGetter 是客户端类,实现PeerGetter接口
@@ -137,6 +156,7 @@ type httpGetter struct {
 
 //使用了gRPC的Get方法
 func (h *httpGetter) Get(in *pb.Request, out *pb.Response) error {
+	fmt.Println("func (h *httpGetter) Get(in *pb.Request, out *pb.Response) error ")
 	u := fmt.Sprintf("%v%v/%v",
 		h.baseURL,
 		url.QueryEscape(in.GetGroup()),

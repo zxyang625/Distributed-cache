@@ -13,3 +13,6 @@ type PeerPicker interface {
 	PickPeer(key string) (peer PeerGetter, ok bool)
 }
 
+type PeerHeart interface {
+	HeartBeatingPeer() ([]byte, error)
+}
