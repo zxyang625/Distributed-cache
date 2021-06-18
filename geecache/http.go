@@ -20,11 +20,12 @@ const defaultReplicas = 3
 
 // HTTPPool 作为承载结点间HTTP通信的核心数据结构
 type HTTPPool struct {
-	self string			//自己的地址,包括ip和端口
-	basePath string		//basePath，作为节点间通讯地址的前缀
-	mu sync.Mutex
-	peers *consistenthash.Map	//用来根据具体的 key 选择节点
-	httpGetters map[string]*httpGetter	//映射远程节点与对应的 httpGetter。每一个远程节点对应一个 httpGetter，因为 httpGetter 与远程节点的地址 baseURL 有关。
+	self        string			//自己的地址,包括ip和端口
+	basePath    string		//basePath，作为节点间通讯地址的前缀
+	mu          sync.Mutex
+	peers       *consistenthash.Map    //用来根据具体的 key 选择节点
+	httpGetters map[string]*httpGetter //映射远程节点与对应的 httpGetter。每一个远程节点对应一个 httpGetter，因为 httpGetter 与远程节点的地址 baseURL 有关。
+	//failedPeers map[string]*time.Time  //记录失去连接的结点以及时间
 }
 
 type failMsg struct {
@@ -48,16 +49,22 @@ func (p *HTTPPool) ListenSentinel(w http.ResponseWriter, r *http.Request) {
 	body, _ := ioutil.ReadAll(r.Body)
 	defer r.Body.Close()
 
+	//if p.failedPeers == nil {
+	//	p.failedPeers = make(map[string]*time.Time)
+	//}
+
 	msg := failMsg{}
 	json.Unmarshal(body, &msg)
-
-	delete(p.httpGetters, msg.PeerName)
-	p.peers.Remove(msg.PeerName)
-	//msg.detectedTime = time.Now()
-	//resp, _ := json.Marshal(msg)
-	//w.Header().Set("Content-Type", "application/json")
-	//w.Write(resp)
-	fmt.Println(p.self, "delete succeed")
+	//if _, ok := p.failedPeers[msg.PeerName]; !ok {
+		delete(p.httpGetters, msg.PeerName)
+		p.peers.Remove(msg.PeerName)
+		//p.failedPeers[msg.PeerName] = &msg.DetectedTime
+		p.Log("%s %s", "delete failed peer", msg.PeerName)
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Write([]byte(fmt.Sprintf("%s delete failed peer %s succeed", p.self, msg.PeerName)))
+	//} else {
+	//	w.Write([]byte(fmt.Sprintf("%s delete failed peer %s succeed", p.self, msg.PeerName)))
+	//}
 }
 
 func (p *HTTPPool) ResponseStatus(w http.ResponseWriter, r *http.Request) {

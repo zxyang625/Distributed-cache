@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	defaultWaitTime        = time.Second * 3
-	defaultRequestInterval = time.Second * 2
+	defaultWaitTime        = time.Second * 2
+	defaultRequestInterval = time.Second * 3
 	defaultPath            = "/_geecache"
 	defaultPUTPath         = "/sentinel"
 	mu 						sync.RWMutex
@@ -116,10 +116,14 @@ func (S *HTTPSentinel) SendFailPeer(peer string, Msg failMsg) {
 
 	req, _ := http.NewRequest("PUT", url, buf)
 	req.Header.Set("Content-Type", "application/json")
-	_, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		S.Log("%s %s %v", "send new peers message failed to", url, err)
+		S.Log("%s %s %v", "send new peers failed to", url, err)
 	}
 
-	S.Log("%s %s", "send new peers message succeed to", peer)
+	body, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		S.Log("%v", err)
+	}
+	S.Log("%s", string(body))
 }

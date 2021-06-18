@@ -41,8 +41,6 @@ func (m *Map) Add(keys ...string) {
 	}
 
 	sort.Ints(m.keys)											//最后对所有哈希值排序
-	fmt.Println(m.keys)
-	fmt.Println(m.hashMap)
 }
 
 // Get 方法实现选择结点
