@@ -25,17 +25,22 @@ package main
 
 import (
 	"cache/geecache"
+	"cache/geecache/sentinel"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
 )
 
-var db = map[string]string{
-	"Tom" : "630",
-	"Jack" : "589",
-	"Fox" : "567",
-}
+var (
+	db = map[string]string{
+		"Tom" : "630",
+		"Jack" : "589",
+		"Fox" : "567",
+	}
+
+	sentinelAddr = "http://localhost:10000"
+)
 
 func createGroup() *geecache.Group {
 	return geecache.NewGroup("scores", 2 << 10, geecache.GetterFunc(
@@ -89,8 +94,10 @@ func startAPIServer(apiAddr string, gee *geecache.Group) {
 func main() {
 	var port int
 	var api bool
+	var sen bool
 	flag.IntVar(&port, "port", 8001, "Geecache server port")
 	flag.BoolVar(&api, "api", false, "Start a api server?")
+	flag.BoolVar(&sen, "sen", false, "start sentinel server")
 	flag.Parse()
 
 	apiAddr := "http://localhost:9999"
@@ -110,5 +117,12 @@ func main() {
 		go startAPIServer(apiAddr, gee)
 	}
 
+	if sen {
+		s := sentinel.NewSentinel(sentinelAddr, addrs, 0, 0)
+		go s.HeartBeating()
+		go s.HandleFailMsg()
+	}
 	startCacheServer(addrMap[port], addrs, gee)
+
+
 }
