@@ -67,10 +67,10 @@ func (p *HTTPPool) ListenSentinel(w http.ResponseWriter, r *http.Request) {
 	//}
 }
 
-func (p *HTTPPool) ResponseStatus(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Write([]byte("hello"))
-}
+//func (p *HTTPPool) ResponseStatus(w http.ResponseWriter, r *http.Request) {
+//	w.Header().Set("Content-Type", "application/octet-stream")
+//	w.Write([]byte("hello"))
+//}
 
 func (p *HTTPPool) GetKey(w http.ResponseWriter, r *http.Request) {
 	parts := strings.SplitN(r.URL.Path[len(defaultBasePath):], "/", 2)

@@ -62,7 +62,10 @@ func startCacheServer(addr string, addrs []string, gee *geecache.Group) {
 	gee.RegisterPeers(peers)
 	log.Println("geecache is running at:", addr)
 	mux := http.NewServeMux()
-	mux.HandleFunc("/_geecache", peers.ResponseStatus)
+
+	//由于采用ping替换http请求，此handleFunc已不再需要
+	//mux.HandleFunc("/_geecache", peers.ResponseStatus)
+
 	mux.HandleFunc("/_geecache/", peers.GetKey)
 	mux.HandleFunc("/sentinel", peers.ListenSentinel)
 	//fmt.Println("addr[7:]:", addr[7:])	//例如:localhost:8001

@@ -28,6 +28,11 @@ func startHttpServer()  {
 	}
 }
 
+func TestPing(t *testing.T) {
+	p := NewPingOption(4, 32, 1000)
+	fmt.Println(Ping("localhost", p))
+}
+
 func TestHeartBeating(t *testing.T) {
 	go startHttpServer()
 

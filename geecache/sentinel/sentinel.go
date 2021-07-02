@@ -7,21 +7,22 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"sync"
+	"regexp"
 	"time"
 )
 
 var (
-	defaultWaitTime        = time.Second * 2
+	defaultPingCount       = 4
+	defaultPingSize        = 32
+	defaultPingTime        = 1000
 	defaultRequestInterval = time.Second * 3
 	defaultPath            = "/_geecache"
 	defaultPUTPath         = "/sentinel"
-	mu 						sync.RWMutex
 )
 
 type HTTPSentinel struct {
 	self            string
-	waitTime        time.Duration
+	//waitTime        time.Duration
 	requestInterval time.Duration
 	peers			map[string]bool
 	ch              chan failMsg
@@ -40,39 +41,46 @@ func (S *HTTPSentinel) Log(format string, v ...interface{}) {
 func NewSentinel (self string, peers []string, waitTime time.Duration, requestInterval time.Duration) *HTTPSentinel {
 	sentinel := &HTTPSentinel{
 		self:            self,
-		waitTime:        waitTime,
+		//waitTime:        waitTime,
 		requestInterval: requestInterval,
 		peers: make(map[string]bool, len(peers)),
 		ch: make(chan failMsg, len(peers) * 3),
 	}
-	for _, v := range peers{
+
+	for _, v := range peers {
 		sentinel.peers[v] = false
 	}
-	if sentinel.waitTime == 0 {
-		sentinel.waitTime = defaultWaitTime
-	}
+
+	//if sentinel.waitTime == 0 {
+	//	sentinel.waitTime = defaultPingTime
+	//}
+
 	if sentinel.requestInterval == 0 {
 		sentinel.requestInterval = defaultRequestInterval
 	}
+
 	return sentinel
 }
 
 func (S *HTTPSentinel) HeartBeating() {
-	for peer, status := range S.peers {
-		go S.RecvHttpMsg(peer, status)
+	for k, _ := range S.peers {
+		go S.RecvHttpMsg(k)
 	}
 }
 
-func (S *HTTPSentinel) RecvHttpMsg(peer string, status bool) {
+func (S *HTTPSentinel) RecvHttpMsg(peer string) {
 	ticker := time.NewTicker(S.requestInterval)
+	op := NewPingOption(defaultPingCount, defaultPingSize, int64(defaultPingTime))
+	//使用正则表达式提取Addr
+	r := regexp.MustCompile("[a-zA-Z0-9]+")
+	//割后变成[http localhost 8001]
+	peerAddrs := r.FindAllString(peer, -1)
+	//选择localhost
+	peerAddr := peerAddrs[1]
 
 	for range ticker.C {
-		client := http.Client{
-			Timeout: S.waitTime,
-		}
-		resp, err := client.Get(peer + defaultPath)
-
-		if err != nil {
+		res := Ping(peerAddr, op)
+		if res == false {
 			S.peers[peer] = false
 
 			failMsg := failMsg{
@@ -86,12 +94,8 @@ func (S *HTTPSentinel) RecvHttpMsg(peer string, status bool) {
 			ticker.Stop()
 
 		} else {
-			bytes, err := ioutil.ReadAll(resp.Body)
-			if err == nil {
-				S.Log("%s %s", peer, string(bytes))
-				S.peers[peer] = true
-				resp.Body.Close()
-			}
+			S.Log("%s %s", "connect successfully with", peer)
+			S.peers[peer] = true
 		}
 	}
 }
