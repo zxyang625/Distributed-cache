@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+var (
+	successRate = 0.6
+)
+
 type PingOption struct{
 	Count     int
 	Size      int
@@ -152,11 +156,11 @@ func Ping(host string, options *PingOption) bool {
 	//todo 先注释，用下一行测试
 	//stat3(ip.String(), sendN, lostN, recvN, shortT, longT, sumT)
 
-	if recvN >= 1{
-		return true
-	} else {
+	if float64(recvN) / float64(sendN) < successRate{
 		return false
 	}
+
+	return true
 }
 
 func checkSum3(msg []byte) uint16 {

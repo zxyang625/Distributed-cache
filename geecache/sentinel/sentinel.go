@@ -79,8 +79,13 @@ func (S *HTTPSentinel) RecvHttpMsg(peer string) {
 	peerAddr := peerAddrs[1]
 
 	for range ticker.C {
-		res := Ping(peerAddr, op)
-		if res == false {
+		t := 0
+		for i := 0; i < 3; i++ {
+			if res := Ping(peerAddr, op); res == false {
+				t++
+			}
+		}
+		if  t >= 2 {
 			S.peers[peer] = false
 
 			failMsg := failMsg{
